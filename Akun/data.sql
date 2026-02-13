@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS users(
+    id SERIAL PRIMARY KEY,
+    nama TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pvkey(
+    nama TEXT UNIQUE REFERENCES users(nama) ON DELETE CASCADE,
+    pv_key TEXT UNIQUE NOT NULL 
+);
+
+
+CREATE INDEX idx_pvkey_pv_nama ON pvkey(pv_key);
