@@ -1,6 +1,7 @@
 package main
 
 import (
+	"akun/key"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,7 +14,86 @@ import (
 )
 
 type userData struct {
-	Nama string `json:"Nama" binding:"required"`
+	Nama string `form:"nama" binding:"required"`
+	Pass string `form:"pass" binding:"required"`
+}
+
+func daftar(db *sqlx.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var data userData
+		if err := c.ShouldBind(&data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Error": "Gagal menerjemahkan",
+			})
+			return
+		}
+		tx, err := db.Beginx()
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"PESAN": "Gagal menyambung ke transaksi",
+			})
+			return
+		}
+		defer tx.Rollback()
+
+		_, err = tx.Exec("INSERT INTO users(nama,pass) VALUES($1,$2)", data.Nama, data.Pass)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "gagal menginsert haha",
+			})
+			return
+		}
+		kunciInggris, err := key.UserPrivateKey()
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = tx.Exec("INSERT INTO pvkey(nama,pv_key) VALUES ($1,$2)", data.Nama, kunciInggris)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "ada error di server",
+			})
+			return
+		}
+		tx.Commit()
+
+		c.JSON(http.StatusOK, gin.H{"message": "Data berhasil ditambahkan"})
+
+	}
+}
+
+func login(db *sqlx.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var dataInput userData
+		var dataDB userData
+
+		if err := c.ShouldBind(&dataInput); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Error": "Internal server error, kami akan segera memperbaiki",
+			})
+			return
+		}
+		err := db.Get(&dataDB, "SELECT * FROM users WHERE nama=$1", dataInput.Nama)
+
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"PESAN": "AKUN ANDA TIDAK DITEMUKAN, SEGERA LAKUKAN PENDAFTARAN",
+			})
+			return
+		}
+		if dataInput.Pass == dataDB.Pass {
+			c.JSON(http.StatusOK, gin.H{
+				"Pesan": "Login Berhasil",
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Pesan": "Password anda salah",
+			})
+			return
+		}
+	}
 }
 
 func main() {
@@ -41,26 +121,8 @@ func main() {
 	}
 	defer db.Close()
 
-	r.POST("/data", func(c *gin.Context) {
-		var data *userData
-		if err := c.ShouldBindJSON(&data); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Error": "Gagal menerjemahkan",
-			})
-			return
-		}
-
-		_, err := db.Exec("INSERT INTO users(nama) VALUES($1)", data.Nama)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "gagal menginsert haha",
-			})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "Data berhasil ditambahkan"})
-
-	})
-
 	r.Run(":8080")
+	r.POST("/daftar", daftar(db))
+	r.POST("/login", login(db))
+
 }
