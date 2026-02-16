@@ -20,6 +20,17 @@ type userData struct {
 	Pass string `form:"pass" binding:"required"`
 }
 
+type request struct {
+	Username  string `json:"username"`
+	Nama_user string `json:"nama_user"`
+}
+
+func pengecekanData(db *sqlx.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+	}
+}
+
 func daftar(db *sqlx.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var data userData
@@ -102,10 +113,11 @@ func login(db *sqlx.DB) gin.HandlerFunc {
 				})
 				return
 			}
+			c.Header("X-user-name", dataDB.Nama)           // Mengirim nama di header
+			c.Header("Authorization", "Bearer "+tokenSaya) // Header standar
 
 			c.JSON(http.StatusOK, gin.H{
 				"Pesan": "Login Berhasil",
-				"token": tokenSaya,
 			})
 
 			return
@@ -145,6 +157,7 @@ func main() {
 
 	r.POST("/daftar", daftar(db))
 	r.POST("/login", login(db))
+	r.POST("/cek/dataPembeli", pengecekanData(db))
 	r.Run(":8080")
 	fmt.Println("server berjalan di port 8080")
 
