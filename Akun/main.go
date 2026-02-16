@@ -1,11 +1,13 @@
 package main
 
 import (
-	"akun/key"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+
+	"akun/key"
+	"auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -68,6 +70,7 @@ func login(db *sqlx.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var dataInput userData
 		var dataDB userData
+		var pvKey string
 
 		if err := c.ShouldBind(&dataInput); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -84,9 +87,28 @@ func login(db *sqlx.DB) gin.HandlerFunc {
 			return
 		}
 		if dataInput.Pass == dataDB.Pass {
+			err := db.Get(&pvKey, "SELECT pv_key FROM pvkey WHERE nama=$1", dataInput.Nama)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Ada error di server kami, kalian tidak berkah masuk sini saatt!",
+				})
+				return
+			}
+			tokenSaya, err := auth.GenerateToken(dataInput.Nama, []byte(pvKey))
+
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Pesan": "Anda mau ngapain sat?",
+				})
+				return
+			}
+
 			c.JSON(http.StatusOK, gin.H{
 				"Pesan": "Login Berhasil",
+				"token": tokenSaya,
 			})
+
+			return
 		} else {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"Pesan": "Password anda salah",
@@ -121,8 +143,9 @@ func main() {
 	}
 	defer db.Close()
 
-	r.Run(":8080")
 	r.POST("/daftar", daftar(db))
 	r.POST("/login", login(db))
+	r.Run(":8080")
+	fmt.Println("server berjalan di port 8080")
 
 }
