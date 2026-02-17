@@ -25,9 +25,37 @@ type request struct {
 	Nama_user string `json:"nama_user"`
 }
 
+type hasilRequest struct {
+	Keterangan bool   `json:"keterangan"`
+	Pv_key     string `json:"pvkey"`
+}
+
 func pengecekanData(db *sqlx.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var req request
+		var pvkey string
+		if err := c.ShouldBindJSON(&req); err != nil {
+			fmt.Println("Ko su tau sa ni benar-benar cinta")
+			return
+		}
 
+		// logika pengecekan username tujuan/username penjual
+
+		err := db.Get(&pvkey, "SELECT pv_key FROM pvkey WHERE nama=$1", req.Username)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, hasilRequest{
+				Keterangan: false,
+				Pv_key:     "",
+			})
+
+			return
+		}
+
+		c.JSON(http.StatusOK, hasilRequest{
+			Keterangan: true,
+			Pv_key:     pvkey,
+		})
 	}
 }
 

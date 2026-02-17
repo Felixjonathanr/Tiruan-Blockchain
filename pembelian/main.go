@@ -1,18 +1,18 @@
 package main
 
 import (
+	"akun/key"
 	"bytes"
-	"crypto/rsa"
-	"crypto/x509"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
+
+	"github.com/skip2/go-qrcode"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 )
 
 /*
@@ -51,37 +51,6 @@ if err := c.ShouldBind(&data); err != nil {
 			return
 		}
 */
-
-func decodeKey(key string) (*rsa.PrivateKey, error) {
-	err := godotenv.Load()
-
-	if err != nil {
-		log.Fatal("error loading .env File")
-		return nil, err
-	}
-
-	mk := []byte(os.Getenv("MASTER_KEY"))
-	kuncibyte := []byte(key)
-
-	block, _ := pem.Decode(kuncibyte)
-
-	derBytes, err := x509.DecryptPEMBlock(block, mk)
-
-	if err != nil {
-		fmt.Println("GAGAL..... sakit hati lagi anjir lah")
-		return nil, err
-	}
-
-	privateKey, err := x509.ParsePKCS1PrivateKey(derBytes)
-
-	if err != nil {
-		fmt.Println("Kenapa lu harus hadir di hidup gua kalau engga jadi punyaku? hanying lah")
-		return nil, err
-	}
-
-	return privateKey, nil
-
-}
 
 func pembeli(c *gin.Context) {
 	var dataPembeli dataPembelian
@@ -135,12 +104,41 @@ func pembeli(c *gin.Context) {
 		return
 	}
 
-	kunciSaya, err := decodeKey(hasil.Pv_key)
+	kunciSaya, err := key.DecodeKey(hasil.Pv_key)
 
 	if err != nil {
 		fmt.Println("Tuhan, jika dia bukan buat aku, tolong berikan yang sama persis sepertinya")
 		return
 	}
+
+	// di sini mekanisme signed data
+
+	dataJson, err := json.Marshal(dataPembeli)
+
+	if err != nil {
+		fmt.Println("Ada error di bagian pembuatan signed data")
+		return
+	}
+
+	h := hmac.New(sha256.New, kunciSaya.N.Bytes())
+
+	h.Write(dataJson)
+
+	signature := h.Sum(nil)
+
+	dataAkhir := fmt.Sprintf("%s.%s",
+		base64.StdEncoding.EncodeToString(dataJson),
+		base64.StdEncoding.EncodeToString(signature),
+	)
+
+	png, err := qrcode.Encode(dataAkhir, qrcode.Medium, 256)
+
+	if err != nil {
+		fmt.Println("Hita nadua gabe sada")
+		return
+	}
+
+	c.Data(200, "image/png", png)
 
 }
 
