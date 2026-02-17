@@ -1,13 +1,12 @@
 package main
 
 import (
+	"akun/key"
+	"auth"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-
-	"akun/key"
-	"auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -21,8 +20,8 @@ type userData struct {
 }
 
 type request struct {
-	Username  string `json:"username"`
-	Nama_user string `json:"nama_user"`
+	Username  string `json:"username"`  //username tujuan
+	Nama_user string `json:"nama_user"` //username pengguna buat minta pv_key
 }
 
 type hasilRequest struct {
@@ -54,7 +53,8 @@ func pengecekanData(db *sqlx.DB) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, hasilRequest{
 			Keterangan: true,
-			Pv_key:     pvkey,
+			// pengecekan kunci yang login saat itu, digunakan untuk signed string penjual
+			Pv_key: pvkey,
 		})
 	}
 }
